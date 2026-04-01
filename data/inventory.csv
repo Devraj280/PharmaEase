@@ -1,0 +1,41 @@
+Medicine Name,Category,Quantity,Price,Expiry,Supplier
+Paracetamol 500mg,Analgesic,319,12.5,2026-04-14,MedPlus Pharma
+Amoxicillin 250mg,Antibiotic,150,45.0,2024-07-24,Cipla Ltd
+Ibuprofen 400mg,NSAID,210,18.0,2025-03-06,Sun Pharma
+Cetirizine 10mg,Antihistamine,150,22.0,2024-11-18,MedPlus Pharma
+Omeprazole 20mg,Antacid,95,35.0,2026-05-22,Mankind Pharma
+Metformin 500mg,Antidiabetic,4,28.0,2024-09-26,Mankind Pharma
+Atorvastatin 10mg,Statin,88,55.0,2025-09-04,MedPlus Pharma
+Azithromycin 500mg,Antibiotic,72,85.0,2024-07-29,MedPlus Pharma
+Pantoprazole 40mg,Antacid,140,42.0,2025-02-07,Sun Pharma
+Amlodipine 5mg,Antihypertensive,5,32.0,2025-11-28,Mankind Pharma
+Clopidogrel 75mg,Antiplatelet,60,68.0,2024-07-26,Mankind Pharma
+Levothyroxine 50mcg,Thyroid,45,75.0,2025-01-18,Mankind Pharma
+Salbutamol Inhaler,Bronchodilator,38,185.0,2025-09-01,Sun Pharma
+Insulin Glargine,Antidiabetic,22,650.0,2025-10-01,Mankind Pharma
+Dolo 650mg,Analgesic,400,14.0,2025-04-09,MedPlus Pharma
+Ranitidine 150mg,Antacid,3,18.5,2024-12-09,Dr Reddy's
+Diclofenac 50mg,NSAID,195,16.0,2025-06-12,Cipla Ltd
+Metronidazole 400mg,Antibiotic,110,12.0,2024-12-05,Sun Pharma
+Losartan 50mg,Antihypertensive,75,48.0,2025-06-08,MedPlus Pharma
+Vitamin D3 60K,Supplement,260,95.0,2024-10-01,Dr Reddy's
+Vitamin B12 500mcg,Supplement,180,42.0,2024-10-06,Cipla Ltd
+Calcium + D3 Tablet,Supplement,220,55.0,2025-06-16,Mankind Pharma
+Multivitamin Tablet,Supplement,145,38.0,2025-03-26,MedPlus Pharma
+Ondansetron 4mg,Antiemetic,90,25.0,2025-10-12,Mankind Pharma
+Clonazepam 0.5mg,Anxiolytic,55,32.0,2024-11-03,Dr Reddy's
+Hydrochlorothiazide 25mg,Diuretic,85,22.0,2024-09-17,Mankind Pharma
+Montelukast 10mg,Antiasthmatic,65,68.0,2025-04-25,Mankind Pharma
+Fluconazole 150mg,Antifungal,40,55.0,2025-07-04,Mankind Pharma
+Doxycycline 100mg,Antibiotic,8,38.0,2025-01-11,MedPlus Pharma
+Cefixime 200mg,Antibiotic,95,72.0,2024-08-14,Sun Pharma
+Chlorpheniramine 4mg,Antihistamine,175,8.0,2025-04-21,MedPlus Pharma
+Albendazole 400mg,Antiparasitic,130,28.0,2025-02-22,MedPlus Pharma
+Acyclovir 400mg,Antiviral,45,62.0,2025-07-23,Cipla Ltd
+Iron + Folic Acid,Supplement,200,18.0,2025-10-06,Cipla Ltd
+Aspirin 75mg,Antiplatelet,310,9.0,2024-12-12,Cipla Ltd
+Glimepiride 2mg,Antidiabetic,7,45.0,2025-06-27,Sun Pharma
+Sertraline 50mg,Antidepressant,42,85.0,2026-05-16,Cipla Ltd
+Prednisolone 5mg,Corticosteroid,68,15.0,2026-06-17,MedPlus Pharma
+Loperamide 2mg,Antidiarrheal,120,22.0,2026-03-14,Sun Pharma
+Zinc Sulphate 20mg,Supplement,190,32.0,2025-12-27,Sun Pharma
