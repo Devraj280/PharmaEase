@@ -648,98 +648,155 @@ elif menu == "🩺  Symptom Checker":
 
     if models["model"] is None:
         st.error(
-            "⚠️ Model files not found. Place model.pkl, label_encoder.pkl, symptom_list.pkl, disease_list.pkl in the project root."
-        )
+            "⚠️ Model files not found. Place model.pkl, label_encoder.pkl, "
+            "symptom_list.pkl, disease_list.pkl in the project root.")
         st.stop()
 
     symptom_list = models["symptom_list"]
     sorted_opts, category_map = build_sorted_symptoms(symptom_list)
 
-    # Disclaimer
-    st.warning(
-        "⚠️ **Medical Disclaimer:** For informational purposes only. Always consult a licensed doctor for diagnosis and treatment."
-    )
-    st.markdown("#### 🔍 Select Symptoms")
-    st.caption(
-        "Filter by body system using buttons below, or type directly in the search box"
-    )
+    # ── Initialize session state ──
+    if "sc_selected" not in st.session_state:
+        st.session_state["sc_selected"] = []
+    if "sc_cat" not in st.session_state:
+        st.session_state["sc_cat"] = None
 
-    # Category filter buttons
+    # ── Disclaimer ──
+    st.warning("⚠️ **Medical Disclaimer:** For informational purposes only. "
+               "Always consult a licensed doctor for diagnosis and treatment.")
+
+    st.markdown("#### 🔍 Step 1 — Select Main Symptoms")
+    st.caption("Filter by body system or type directly in the search box")
+
+    # ── Category filter buttons ──
     cat_names = list(SYMPTOM_CATEGORIES.keys())
     btn_cols = st.columns(5)
-    sel_cat = st.session_state.get("selected_cat", None)
     for i, cat in enumerate(cat_names):
         with btn_cols[i % 5]:
-            if st.button(cat, key=f"cat_{i}", use_container_width=True):
-                st.session_state[
-                    "selected_cat"] = None if sel_cat == cat else cat
+            active = st.session_state["sc_cat"] == cat
+            if st.button(("✅ " if active else "") + cat,
+                         key=f"cat_{i}",
+                         use_container_width=True):
+                st.session_state["sc_cat"] = None if active else cat
                 st.rerun()
 
-    sel_cat = st.session_state.get("selected_cat", None)
+    sel_cat = st.session_state["sc_cat"]
+    fl = {s.lower(): s for s in symptom_list}
+
+    # Build display options
     if sel_cat:
-        fl = {s.lower(): s for s in symptom_list}
-        display_opts = sorted([
+        base_opts = sorted([
             fl[k.lower()] for k in SYMPTOM_CATEGORIES[sel_cat]
             if k.lower() in fl
         ])
-        st.info(f"Showing **{len(display_opts)}** symptoms for {sel_cat}")
+        st.info(f"Showing **{len(base_opts)}** symptoms for {sel_cat}")
     else:
-        display_opts = sorted_opts
+        base_opts = sorted_opts
 
-    # Multiselect — synced with quick_add session state
-    quick_add = st.session_state.get("quick_add", [])
-    valid_default = [s for s in quick_add if s in display_opts]
+    # Always include already-selected items so they don't vanish on category switch
+    extra = [s for s in st.session_state["sc_selected"] if s not in base_opts]
+    ms_opts = extra + base_opts
 
+    # ── Multiselect — NO key=, NO on_change= ──
+    # We read the return value directly; session state updated below
     selected = st.multiselect(
         "Symptoms",
-        options=display_opts,
-        default=valid_default,
+        options=ms_opts,
+        default=[s for s in st.session_state["sc_selected"] if s in ms_opts],
         placeholder="Type to search symptoms...",
         label_visibility="collapsed",
-        format_func=lambda x: f"{category_map.get(x,'🔬')}  {x}",
+        format_func=lambda x: f"{category_map.get(x, '🔬')}  {x}",
     )
-    st.session_state["quick_add"] = selected  # keep in sync
 
-    # Selected pills
+    # Sync back to session state from multiselect return value
+    st.session_state["sc_selected"] = selected
+
+    # ── Selected pills ──
     if selected:
         st.markdown(" ".join(f'<span class="sym-pill">{s}</span>'
                              for s in selected),
                     unsafe_allow_html=True)
         st.caption(f"✅ {len(selected)} symptom(s) selected")
 
-    # ── Smart co-occurrence suggestions ──
+    # ── Smart Co-occurrence Suggestions ──
     if selected:
-        suggestions = get_suggestions(selected, cooc_data, n=8)
-        if suggestions:
-            st.markdown("---")
-            st.markdown("#### 💡 Suggested Next Symptoms")
-            st.caption(
-                "Most commonly reported alongside your current selection — click any to add instantly"
-            )
-            sc = st.columns(4)
-            for idx, (sym, freq) in enumerate(suggestions):
-                with sc[idx % 4]:
-                    short = sym[:25] + ("…" if len(sym) > 25 else "")
-                    if st.button(
-                            f"+ {short}",
-                            key=f"sug_{idx}_{sym[:10]}",
-                            use_container_width=True,
-                            help=
-                            f"Reported by {freq:,} patients in the training dataset"
-                    ):
-                        updated = list(dict.fromkeys(selected +
-                                                     [sym]))  # deduplicate
-                        st.session_state["quick_add"] = updated
-                        st.rerun()
-            st.caption(
-                "💬 Hover any button to see patient frequency · Clicking adds it instantly"
-            )
-        elif not cooc_data:
-            st.caption(
-                "💡 Tip: Run the Colab co-occurrence cell to enable smart suggestions"
-            )
+        st.markdown("---")
+        st.markdown("#### 💡 Step 2 — Add Related Symptoms")
+        st.caption(
+            "Symptoms most commonly found **together** with your selection in 246,945 patient records"
+        )
 
-    # Action buttons
+        if cooc_data:
+            cooc = cooc_data.get("cooccurrence", {})
+            sym_freq = cooc_data.get("symptom_frequency", {})
+
+            # IDF-weighted scoring — penalizes globally common symptoms
+            raw_scores = defaultdict(float)
+            for sel_sym in selected:
+                if sel_sym in cooc:
+                    for co_sym, count in cooc[sel_sym]:
+                        if co_sym not in selected:
+                            global_freq = sym_freq.get(co_sym, 1)
+                            weight = count / (1 + global_freq / 1000)
+                            raw_scores[co_sym] += weight
+
+            top_suggestions = sorted(raw_scores.items(),
+                                     key=lambda x: x[1],
+                                     reverse=True)[:8]
+
+            if top_suggestions:
+                sug_cols = st.columns(4)
+                for idx, (sym, _) in enumerate(top_suggestions):
+                    freq = sym_freq.get(sym, 0)
+                    short = sym[:24] + ("…" if len(sym) > 24 else "")
+                    with sug_cols[idx % 4]:
+                        if st.button(
+                                f"+ {short}",
+                                key=f"sug_{idx}",
+                                use_container_width=True,
+                                help=
+                                f"'{sym}' co-occurs with your symptoms in {freq:,} patients"
+                        ):
+                            # ── KEY FIX: only update our own state key, never the widget key ──
+                            if sym not in st.session_state["sc_selected"]:
+                                st.session_state["sc_selected"].append(sym)
+                            st.rerun()
+
+                st.caption(
+                    "💬 Hover any button to see patient frequency · Click to add instantly"
+                )
+            else:
+                st.info(
+                    "No specific related symptoms found — try adding more symptoms above."
+                )
+
+        else:
+            # Fallback: suggest from same body system category
+            st.caption(
+                "💡 Showing category-based suggestions (run Colab co-occurrence cell for smarter results)"
+            )
+            from collections import Counter
+            cats_selected = [category_map.get(s, "") for s in selected]
+            dominant = Counter(cats_selected).most_common(1)
+            if dominant:
+                dom_cat = dominant[0][0]
+                fallback = [
+                    fl[k.lower()] for k in SYMPTOM_CATEGORIES.get(dom_cat, [])
+                    if k.lower() in fl and fl[k.lower()] not in selected
+                ][:8]
+                if fallback:
+                    fc = st.columns(4)
+                    for idx, sym in enumerate(fallback):
+                        short = sym[:24] + ("…" if len(sym) > 24 else "")
+                        with fc[idx % 4]:
+                            if st.button(f"+ {short}",
+                                         key=f"fb_{idx}",
+                                         use_container_width=True):
+                                if sym not in st.session_state["sc_selected"]:
+                                    st.session_state["sc_selected"].append(sym)
+                                st.rerun()
+
+    # ── Action buttons ──
     st.markdown("<br>", unsafe_allow_html=True)
     b1, b2, _ = st.columns([2, 1, 4])
     with b1:
@@ -748,14 +805,14 @@ elif menu == "🩺  Symptom Checker":
                                 disabled=len(selected) == 0)
     with b2:
         if st.button("🗑️ Clear All", use_container_width=True):
-            st.session_state["quick_add"] = []
-            st.session_state["selected_cat"] = None
+            st.session_state["sc_selected"] = []
+            st.session_state["sc_cat"] = None
             st.rerun()
 
     if 0 < len(selected) < 4:
         st.warning(
-            "💡 **Tip:** Select at least 4–6 symptoms for better prediction accuracy. Use the suggestions above!"
-        )
+            "💡 **Tip:** Select at least 4–6 symptoms for better accuracy. "
+            "Use the **Related Symptoms** buttons above!")
 
     # ── Prediction ──
     if analyze_btn and selected:
@@ -768,7 +825,7 @@ elif menu == "🩺  Symptom Checker":
             st.markdown("---")
             st.markdown("### 🔮 Prediction Results")
             st.caption(
-                "Confidence shown relative to top predictions · More symptoms = higher accuracy"
+                "Confidence is relative to top predictions · More symptoms = higher accuracy"
             )
 
             sev_icon = {"mild": "🟢", "moderate": "🟡", "severe": "🔴"}
@@ -783,12 +840,15 @@ elif menu == "🩺  Symptom Checker":
                 st.markdown(f"**{rank} — {dname.title()}**")
                 st.markdown(f"""
                 <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;">
-                    <div style="font-size:16px;font-weight:600;color:#0f172a;min-width:260px;">{dname.title()}</div>
-                    <div style="font-size:14px;color:#2563eb;font-weight:600;">{conf:.1f}%</div>
+                    <div style="font-size:16px;font-weight:600;color:#0f172a;
+                                min-width:260px;">{dname.title()}</div>
+                    <div style="font-size:14px;color:#2563eb;
+                                font-weight:600;">{conf:.1f}%</div>
                     <div style="font-size:11px;color:#94a3b8;">raw: {raw}%</div>
                 </div>
-                <div class="conf-bar-bg"><div class="conf-bar-fill" style="width:{max(conf,5)}%;"></div></div>
-                """,
+                <div class="conf-bar-bg">
+                    <div class="conf-bar-fill" style="width:{max(conf,5)}%;"></div>
+                </div>""",
                             unsafe_allow_html=True)
 
                 if info:
@@ -829,11 +889,11 @@ elif menu == "🩺  Symptom Checker":
                                 st.caption("No medicine categories listed.")
                         if consult:
                             st.info(f"🩺 **Consult a doctor if:** {consult}")
-                        # Inventory cross-check
                         if not inv_df.empty and "Medicine Name" in inv_df.columns and meds:
                             ml = [m.lower() for m in meds]
                             in_stock = [
-                                f"**{r['Medicine Name']}** — {r.get('Quantity',0)} units @ ₹{r.get('Price',0)}"
+                                f"**{r['Medicine Name']}** — "
+                                f"{r.get('Quantity',0)} units @ ₹{r.get('Price',0)}"
                                 for _, r in inv_df.iterrows()
                                 if any(c in str(r["Medicine Name"]).lower()
                                        or str(r["Medicine Name"]).lower() in c
@@ -854,7 +914,8 @@ elif menu == "🩺  Symptom Checker":
                 st.markdown("")
 
             st.info(
-                "⚕️ **Important:** Suggestions are for *temporary relief only*. Visit a licensed physician for proper evaluation and treatment."
+                "⚕️ **Important:** Suggestions are for *temporary relief only*. "
+                "Visit a licensed physician for proper evaluation and treatment."
             )
 
 # ═══════════════════════════════════════════════
@@ -1029,8 +1090,7 @@ elif menu == "📊  Reports & Analytics":
                     ).sort_values(ascending=False).head(8).reset_index()
                     tc.columns = ["Customer", "Spend"]
                     tc["Spend"] = tc["Spend"].map("₹{:,.0f}".format)
-                    tc.index = range(1,
-                                     len(tc) + 1)
+                    tc.index = range(1, len(tc) + 1)
                     st.dataframe(tc, use_container_width=True)
                 with c6:
                     st.markdown("**Recent Transactions**")
@@ -1042,8 +1102,7 @@ elif menu == "📊  Reports & Analytics":
                                                ]].copy()
                     rec["Amount"] = rec["Amount"].map("₹{:,.2f}".format)
                     rec["Date"] = rec["Date"].dt.strftime("%d %b %Y")
-                    rec.index = range(1,
-                                      len(rec) + 1)
+                    rec.index = range(1, len(rec) + 1)
                     st.dataframe(rec, use_container_width=True)
 
         with tab2:
@@ -1247,8 +1306,7 @@ elif menu == "📊  Reports & Analytics":
                         "Patient", "Doctor", "Medicine", "Date", "Notes"
                     ]].copy()
                     rs["Date"] = rs["Date"].dt.strftime("%d %b %Y")
-                    rs.index = range(1,
-                                     len(rs) + 1)
+                    rs.index = range(1, len(rs) + 1)
                     st.markdown("**Full Prescription Records**")
                     st.dataframe(rs, use_container_width=True, height=280)
 
